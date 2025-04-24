@@ -143,7 +143,7 @@ with st.sidebar:
     # Display the logo using markdown
     st.markdown(logo_html, unsafe_allow_html=True)
 
-    st.header("⚙️ Settings & Controls") # Header remains
+    #st.header("⚙️ Settings & Controls") # Header remains
 
     # --- API Key Handling Logic (Unchanged) ---
     # ... (Keep the existing API key handling logic) ...
@@ -267,7 +267,7 @@ theming_gen_config = GenerationConfig(
 with input_tab:
     # ... (Keep existing Input Tab code - PASTE HERE) ...
     # It will now render with the new theme applied via CSS
-    st.header("1. Input Data and Generate Initial Themes")
+    st.header("Input Data and Generate Initial Themes")
     st.session_state[cfg.SURVEY_QUESTION_KEY] = st.text_area("❓ **Survey Question:**", value=st.session_state.get(cfg.SURVEY_QUESTION_KEY, ''), height=100, key="theming_q_input_main", placeholder="e.g., What aspects of the recent workshop did you find most valuable?")
     st.markdown("---")
     st.subheader("Provide Responses")
