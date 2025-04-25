@@ -83,7 +83,10 @@ def display_theme_distribution(df_state_key):
         st.subheader("Overall Sub-theme Distribution") # Sub-themes
         excluded_subs = ['N/A', 'Error', 'General', 'Other', '', 'nan', 'None']; sub_counts = df_valid[~df_valid['assigned_sub_theme'].astype(str).isin(excluded_subs) & (df_valid['assigned_theme'] != "Uncategorized")]['assigned_sub_theme'].value_counts().reset_index(); sub_counts.columns = ['Sub-theme', 'Count']
         if not sub_counts.empty:
-            max_subs = 25; if len(sub_counts) > max_subs: sub_counts = sub_counts.head(max_subs); st.caption(f"Showing top {max_subs} sub-themes.")
+            max_subs = 25; 
+            if len(sub_counts) > max_subs: 
+                sub_counts = sub_counts.head(max_subs); 
+                st.caption(f"Showing top {max_subs} sub-themes.")
             fig_sub = px.bar(sub_counts, x='Sub-theme', y='Count', title="Distribution of Top Specific Sub-themes", color_discrete_sequence=px.colors.qualitative.Set2, template=plotly_template); fig_sub.update_layout(xaxis_title=None, yaxis_title="Responses", xaxis_tickangle=-45, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'); st.plotly_chart(fig_sub, use_container_width=True)
         else: st.info("No specific sub-themes found for distribution.")
     except Exception as e: st.error(f"Chart error: {e}"); logging.exception("Failed generating distribution plots.")
