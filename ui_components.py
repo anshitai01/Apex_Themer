@@ -2,13 +2,12 @@
 """
 Functions for creating and displaying UI components in the Streamlit app.
 Includes visualizations (word cloud, charts), editors (themes, assignments),
-and data exploration elements.
-Includes fix for data editor state handling.
+and data exploration elements. Includes further refinements for data editor state.
 """
 
 import streamlit as st
 import pandas as pd
-import numpy as np # Import numpy
+import numpy as np
 import matplotlib.pyplot as plt
 import plotly.express as px
 from wordcloud import WordCloud
@@ -26,20 +25,16 @@ from config import (
     MAIN_BACKGROUND_COLOR, BODY_TEXT_COLOR, CARD_BACKGROUND_COLOR, INPUT_BORDER_COLOR,
     MAIN_TITLE_COLOR, SUBTITLE_COLOR # Add others needed by charts/components
 )
-# Import COLOR_SCHEME if still used elsewhere, otherwise remove if fully replaced
-# from config import COLOR_SCHEME
-
 
 # --- Visualization Functions ---
 # (Keep create_word_cloud and display_theme_distribution functions as they were)
-# Word Cloud (Adapted for Dark Theme)
 def create_word_cloud(responses):
-    # ... (existing code) ...
+    # ... (Function code omitted for brevity - Keep existing) ...
     if not responses: logging.info("Word cloud skipped: No responses."); return None
     try:
         text_list = [str(r).strip() for r in responses if r and isinstance(r, (str, int, float)) and str(r).strip()]
         if not text_list: logging.info("Word cloud skipped: No valid text."); return None
-        text = ' '.join(text_list)
+        text = ' '.join(text_list);
         if not text.strip(): logging.info("Word cloud skipped: Empty text."); return None
         wordcloud = WordCloud(width=800, height=350, background_color=None, mode="RGBA", colormap='plasma', max_words=100, random_state=42).generate(text)
         fig, ax = plt.subplots(figsize=(10, 4)); fig.patch.set_alpha(0.0); ax.patch.set_alpha(0.0)
@@ -52,9 +47,8 @@ def create_word_cloud(responses):
     except ImportError as ie: st.error(f"Word cloud ImportError: {ie}"); logging.error(f"Word cloud ImportError: {ie}"); return None
     except Exception as e: st.error(f"Word cloud unexpected error: {e}"); logging.exception("Word cloud generation failed."); return None
 
-# Theme Distribution Charts (Adapted for Dark Theme)
 def display_theme_distribution(df_state_key):
-    # ... (existing code) ...
+    # ... (Function code omitted for brevity - Keep existing) ...
     if df_state_key not in st.session_state or not isinstance(st.session_state.get(df_state_key), pd.DataFrame): st.info("Assign themes first for charts."); return
     df = st.session_state[df_state_key]
     if df.empty or 'assigned_theme' not in df.columns: st.info("No assignment data for charts."); return
@@ -83,18 +77,15 @@ def display_theme_distribution(df_state_key):
         st.subheader("Overall Sub-theme Distribution") # Sub-themes
         excluded_subs = ['N/A', 'Error', 'General', 'Other', '', 'nan', 'None']; sub_counts = df_valid[~df_valid['assigned_sub_theme'].astype(str).isin(excluded_subs) & (df_valid['assigned_theme'] != "Uncategorized")]['assigned_sub_theme'].value_counts().reset_index(); sub_counts.columns = ['Sub-theme', 'Count']
         if not sub_counts.empty:
-            max_subs = 25; 
-            if len(sub_counts) > max_subs: 
-                sub_counts = sub_counts.head(max_subs); 
-                st.caption(f"Showing top {max_subs} sub-themes.")
+            max_subs = 25
+            if len(sub_counts) > max_subs: sub_counts = sub_counts.head(max_subs); st.caption(f"Showing top {max_subs} specific sub-themes.")
             fig_sub = px.bar(sub_counts, x='Sub-theme', y='Count', title="Distribution of Top Specific Sub-themes", color_discrete_sequence=px.colors.qualitative.Set2, template=plotly_template); fig_sub.update_layout(xaxis_title=None, yaxis_title="Responses", xaxis_tickangle=-45, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'); st.plotly_chart(fig_sub, use_container_width=True)
         else: st.info("No specific sub-themes found for distribution.")
     except Exception as e: st.error(f"Chart error: {e}"); logging.exception("Failed generating distribution plots.")
 
-
 # --- Editor and Data Display Functions ---
 
-# Theme Editor (No changes needed for this fix)
+# Theme Editor
 def display_theme_editor(themes_data_state_key=EDITED_THEMES_KEY):
     # ... (Keep the full function code from previous versions) ...
     if themes_data_state_key not in st.session_state or not isinstance(st.session_state.get(themes_data_state_key), list): st.session_state[themes_data_state_key] = []; logging.info(f"Init state '{themes_data_state_key}' for editor.")
@@ -172,57 +163,71 @@ def display_theme_editor(themes_data_state_key=EDITED_THEMES_KEY):
         except Exception as e: st.error(f"Load error: {e}"); logging.exception(f"Error loading theme structure: {up_file.name}")
 
 
-# Assignment Results Editor (with NaN/None handling fix + Safe editor output check)
+# --- Assignment Results Editor (REFINED) ---
 def display_assignment_results_editable(df_state_key=ASSIGNMENT_DF_KEY, themes_state_key=EDITED_THEMES_KEY):
     """
     Displays the theme assignment results in an editable st.data_editor.
-    Includes robust handling for NaN/None before displaying and safe handling of editor output.
+    Includes robust handling for NaN/None and theme options.
     """
-    # --- Initial Check ---
-    if df_state_key not in st.session_state or not isinstance(st.session_state.get(df_state_key), pd.DataFrame):
-        st.info("No assignment results to display/edit. Run assignment first.")
-        return
+    if df_state_key not in st.session_state:
+        st.info("No assignment results available. Run assignment first.")
+        return # Exit if no assignment data key
 
-    # --- Get Data and Ensure it's DataFrame ---
+    # --- Get Data and Validate Type ---
     results_df = st.session_state[df_state_key]
-    if not isinstance(results_df, pd.DataFrame): # Extra check
-        st.error("Invalid assignment data type found in session state. Please rerun assignment.")
-        st.session_state.pop(df_state_key, None) # Clear invalid state
+    if not isinstance(results_df, pd.DataFrame):
+        st.error("Invalid assignment data type found in session state. Rerunning assignment might be needed.")
+        logging.error(f"State key {df_state_key} does not contain a DataFrame.")
+        st.session_state.pop(df_state_key, None)
+        st.rerun() # Rerun after clearing bad state
         return
     if results_df.empty:
-        st.info("Assignment results are empty.")
-        # Optional: Provide a way to clear this empty state if needed
-        # if st.button("Clear Empty Results"): st.session_state.pop(df_state_key, None); st.rerun()
-        return
+         st.info("Assignment results are empty. No data to edit.")
+         return
 
     st.info("Manually review/edit assignments below. Click 'Save Manual Changes' to update.")
 
-    # --- Prepare Theme Options ---
+    # --- Prepare Theme Options (Robustly) ---
     theme_structure = st.session_state.get(themes_state_key, [])
-    valid_theme_labels = []
+    defined_theme_labels = set()
     if isinstance(theme_structure, list) and theme_structure:
-        valid_theme_labels = sorted([str(t.get('theme', '')).strip() for t in theme_structure if t.get('theme') and str(t.get('theme','')).strip()])
-    else: st.warning("Theme structure missing/invalid. Theme dropdown limited.")
-    all_theme_options_set = set(valid_theme_labels) | {"Uncategorized"} | set(results_df['assigned_theme'].astype(str).unique())
-    theme_options = sorted([opt for opt in all_theme_options_set if pd.notna(opt) and str(opt).strip() and "Error" not in opt])
-    if not theme_options: theme_options = ["Uncategorized"]
+        defined_theme_labels = set(str(t.get('theme', '')).strip() for t in theme_structure if t.get('theme') and str(t.get('theme','')).strip())
+    else: st.warning("Theme structure missing/invalid. Theme dropdown options may be limited.")
+
+    # Get unique themes *actually present* in the current dataframe
+    try:
+        themes_in_data = set(results_df['assigned_theme'].astype(str).unique())
+    except KeyError:
+        st.error("'assigned_theme' column missing from results DataFrame. Cannot proceed.")
+        return
+    except Exception as e:
+         st.error(f"Error getting themes from DataFrame: {e}")
+         themes_in_data = set()
+
+    # Combine defined themes, themes in data, and 'Uncategorized'
+    all_theme_options_set = defined_theme_labels | themes_in_data | {"Uncategorized"}
+    # Clean and sort the final options list
+    theme_options = sorted([opt for opt in all_theme_options_set if pd.notna(opt) and str(opt).strip()])
+    if not theme_options: theme_options = ["Uncategorized"] # Ensure at least one default option
 
     # --- DataFrame Preparation for Editor ---
     required_cols = ["response", "assigned_theme", "assigned_sub_theme", "assignment_confidence"]
-    missing_cols = [col for col in required_cols if col not in results_df.columns]
-    if missing_cols:
+    if not all(col in results_df.columns for col in required_cols):
+        missing_cols = [col for col in required_cols if col not in results_df.columns]
         st.error(f"Assignment DF missing required columns: {', '.join(missing_cols)}. Cannot display editor.")
         logging.error(f"Themer Assignment DF missing cols: {missing_cols}")
         return
 
     try:
         df_display = results_df.copy()
-        # FIX: Explicitly fill NaN/None with defaults & ensure string types
+        # Explicitly fill NaN/None with defaults & ensure string types *before* editor
         df_display['assigned_theme'] = df_display['assigned_theme'].fillna("Uncategorized").astype(str)
+        # If theme is not in our calculated options, maybe default it?
+        df_display['assigned_theme'] = df_display['assigned_theme'].apply(lambda x: x if x in theme_options else "Uncategorized")
         df_display['assigned_sub_theme'] = df_display['assigned_sub_theme'].fillna("N/A").astype(str)
         df_display['assignment_confidence'] = df_display['assignment_confidence'].fillna("Low").astype(str)
         df_display['response'] = df_display['response'].fillna("").astype(str)
-        # Enforce 'Uncategorized' rule before display
+        # Enforce 'Uncategorized' rule
         df_display.loc[df_display['assigned_theme'] == "Uncategorized", 'assigned_sub_theme'] = "N/A"
     except Exception as e:
         st.error(f"Failed preparing data for editor: {e}")
@@ -232,70 +237,58 @@ def display_assignment_results_editable(df_state_key=ASSIGNMENT_DF_KEY, themes_s
     # --- Define Column Configurations ---
     column_config = {
         "response": st.column_config.TextColumn("Response", width="large", disabled=True),
-        "assigned_theme": st.column_config.SelectboxColumn("Assigned Theme", width="medium", options=theme_options, required=True),
+        "assigned_theme": st.column_config.SelectboxColumn("Assigned Theme", width="medium", options=theme_options, required=True), # Use robust options
         "assigned_sub_theme": st.column_config.TextColumn("Assigned Sub-theme", width="medium", required=True),
         "assignment_confidence": st.column_config.SelectboxColumn("Confidence", width="small", options=["High", "Medium", "Low"], required=True),
     }
 
     # --- Display Data Editor ---
     st.markdown("#### Edit Assignments")
-    edited_df = st.data_editor(
-        df_display,
-        key=ASSIGNMENT_EDITOR_WIDGET_KEY,
-        use_container_width=True, column_config=column_config,
-        column_order=required_cols, num_rows="fixed", hide_index=True,
-        disabled=["response"]
-    )
+    try:
+        edited_df = st.data_editor(
+            df_display,
+            key=ASSIGNMENT_EDITOR_WIDGET_KEY, # Unique key from config
+            use_container_width=True, column_config=column_config,
+            column_order=required_cols, num_rows="fixed", hide_index=True,
+            disabled=["response"]
+        )
+    except Exception as editor_err:
+         st.error(f"Data editor failed to render: {editor_err}. Try refreshing the page.")
+         logging.exception("Themer: st.data_editor failed to render.")
+         return # Stop if editor itself errors
 
     # --- Save Changes Button ---
     if st.button("💾 Save Manual Assignment Changes", key=f"save_manual_assignments_btn_{df_state_key}"):
-        # --- SAFEGUARD: Check if editor returned a valid DataFrame ---
+        # --- Safeguard: Check editor output ---
         if not isinstance(edited_df, pd.DataFrame):
-            st.error("Error saving changes: Editor did not return valid data. Please refresh and try again.")
-            logging.error("Themer: st.data_editor did not return a DataFrame object.")
-            return # Stop processing if edited_df is not what we expect
+            st.error("Error saving: Editor did not return valid data. Refresh?"); logging.error("Themer: editor output not DataFrame."); return
 
         # --- Validation Logic ---
         valid = True; validation_warnings = []
-        theme_subtheme_map = {str(t.get('theme','')): [str(s) for s in t.get('sub_themes',[])] for t in theme_structure if t.get('theme')}
         for index, row in edited_df.iterrows():
             theme = row['assigned_theme']; sub_theme = row['assigned_sub_theme']
-            # Ensure required fields are not empty after editing
-            if not theme: validation_warnings.append(f"Row {index+1}: Assigned Theme cannot be empty."); valid=False
-            if not sub_theme: validation_warnings.append(f"Row {index+1}: Assigned Sub-theme cannot be empty."); valid=False
-            if not row['assignment_confidence']: validation_warnings.append(f"Row {index+1}: Confidence cannot be empty."); valid=False
-            # Check specific rules
-            if theme == "Uncategorized" and sub_theme != "N/A": validation_warnings.append(f"Row {index+1}: Uncategorized theme needs 'N/A' sub-theme."); valid = False
-            if theme != "Uncategorized" and sub_theme == "N/A": pass # Allow N/A for categorized themes if user chose it
-            elif theme != "Uncategorized" and sub_theme == "General": pass # Allow General
-            # Add any other critical validation here
+            if not theme or not sub_theme or not row['assignment_confidence']: valid=False; validation_warnings.append(f"Row {index+1}: Required fields cannot be empty.")
+            if theme == "Uncategorized" and sub_theme != "N/A": validation_warnings.append(f"Row {index+1}: Uncategorized needs 'N/A' sub-theme."); valid = False
+            # Add other validation if needed
 
         if valid:
-            # Save the edited DataFrame back to session state
-            # Ensure index consistency if needed - data_editor usually maintains it for 'fixed' rows
-            try:
-                # Make sure index aligns if it got reset by editor (unlikely for fixed rows but safe)
+            try: # Save back to state
+                # Ensure index consistency
                 edited_df.index = st.session_state[df_state_key].index
-                st.session_state[df_state_key] = edited_df.copy() # Save a copy
-                st.success("Manual assignment changes saved successfully!")
-                st.toast("Assignments updated!", icon="💾")
-                logging.info(f"Themer: Manual assignments saved to state '{df_state_key}'.")
+                st.session_state[df_state_key] = edited_df.copy()
+                st.success("Manual assignment changes saved!"); st.toast("Assignments updated!", icon="💾")
+                logging.info(f"Themer: Manual assignments saved '{df_state_key}'.")
                 time.sleep(0.5); st.rerun()
-            except Exception as save_err:
-                 st.error(f"Error saving changes: {save_err}")
-                 logging.error(f"Themer: Error saving edited DataFrame: {save_err}")
-
+            except Exception as save_err: st.error(f"Error saving: {save_err}"); logging.error(f"Themer: Error saving DF: {save_err}")
         else:
-            st.error("Validation Failed! Correct issues below before saving:")
-            for i, w in enumerate(validation_warnings):
-                 if i < 5: st.warning(w)
-                 else: st.warning(f"...and {len(validation_warnings) - 5} more issues."); break
-            logging.warning(f"Themer: Manual assignment save failed validation ({len(validation_warnings)} issues).")
+            st.error("Validation Failed! Correct issues before saving:");
+            for i, w in enumerate(validation_warnings): st.warning(w) if i<5 else st.warning(f"...{len(validation_warnings)-5} more issues."); break
+            logging.warning(f"Themer: Manual assignment save validation failed ({len(validation_warnings)} issues).")
 
 
 # Theme Examples Display
 def display_theme_examples(df_state_key=ASSIGNMENT_DF_KEY, themes_state_key=EDITED_THEMES_KEY):
-    # ... (Keep the full function code from previous versions) ...
+    # ... (Keep existing code) ...
     if df_state_key not in st.session_state or not isinstance(st.session_state.get(df_state_key), pd.DataFrame): st.info("Assign themes first."); return
     results_df = st.session_state[df_state_key]
     if results_df.empty or 'assigned_theme' not in results_df.columns: st.info("No assignment data."); return
