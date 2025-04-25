@@ -269,22 +269,29 @@ def display_theme_editor(themes_data_state_key=EDITED_THEMES_KEY):
 def display_assignment_results_editable(df_state_key=ASSIGNMENT_DF_KEY, themes_state_key=EDITED_THEMES_KEY):
     """
     Displays the theme assignment results in an editable st.data_editor.
-    Cleans the DataFrame more directly before passing to the editor.
+    Includes robust checks to prevent error loops.
     """
-    if df_state_key not in st.session_state:
-        st.info("No assignment results available. Run assignment first.")
-        return
+    # --- Get Data and Validate --- ## <<< CORRECTED VALIDATION LOGIC START >>> ##
+    if df_state_key not in st.session_state or \
+       not isinstance(st.session_state.get(df_state_key), pd.DataFrame) or \
+       st.session_state.get(df_state_key, pd.DataFrame()).empty:
+        # Combine checks: Key exists? Is it a DF? Is it empty?
 
-    # --- Get Data and Validate Type ---
-    results_df = st.session_state[df_state_key] # Get the reference from state
-    if not isinstance(results_df, pd.DataFrame):
-        st.error("Invalid assignment data type in session state. Rerun assignment?")
-        logging.error(f"State key {df_state_key} not DataFrame.")
-        st.session_state.pop(df_state_key, None); st.rerun()
-        return
-    if results_df.empty:
-         st.info("Assignment results are empty.")
-         return
+        # Only log error and clear state if key exists but is WRONG TYPE
+        if df_state_key in st.session_state and not isinstance(st.session_state.get(df_state_key), pd.DataFrame):
+             logging.error(f"State key {df_state_key} is not a DataFrame (Type: {type(st.session_state.get(df_state_key))}). Clearing.")
+             st.session_state.pop(df_state_key, None) # Clear only if wrong type
+             st.warning("Cleared invalid assignment data. Please run assignment again.")
+             # Don't rerun here, let the main script flow continue or the user interact
+        else:
+             # If key missing or DF is empty, just show info message and return
+             st.info("No assignment results to display/edit. Run assignment first.")
+        return # Exit function gracefully if no valid, non-empty DataFrame
+
+    # If we reach here, results_df should be a non-empty DataFrame
+    results_df = st.session_state[df_state_key]
+    # --- End of Modified Validation --- ## <<< CORRECTED VALIDATION LOGIC END >>> ##
+
 
     st.info("Manually review/edit assignments below. Click 'Save Manual Changes' to update.")
 
