@@ -231,54 +231,147 @@ theming_gen_config = GenerationConfig(
 )
 
 # ======================= Tab 1: Input & Generate ==========================
-# (Keep existing Themer Input Tab code - PASTE HERE, ensure using cfg keys)
+# ======================= Tab 1: Input & Generate ==========================
 with input_tab:
     st.header("1. Input Data and Generate Initial Themes")
-    st.session_state[cfg.SURVEY_QUESTION_KEY] = st.text_area("❓ **Survey Question:**", value=st.session_state.get(cfg.SURVEY_QUESTION_KEY, ''), height=100, key="theming_q_input_main", placeholder="e.g., What aspects of the event did you find most valuable?")
-    st.markdown("---"); st.subheader("Provide Responses")
-    st.radio("Choose input method:", ("Paste Text", "Upload File (.csv, .xlsx)"), key=cfg.INPUT_METHOD_KEY, horizontal=True, label_visibility="collapsed")
-    input_method = st.session_state[cfg.INPUT_METHOD_KEY]; responses_list_input = []
+
+    # --- Survey Question Input ---
+    st.session_state[cfg.SURVEY_QUESTION_KEY] = st.text_area(
+        "❓ **Survey Question:**",
+        value=st.session_state.get(cfg.SURVEY_QUESTION_KEY, ''),
+        height=100, key="theming_q_input_main",
+        placeholder="e.g., What aspects of the event did you find most valuable?"
+    )
+
+    st.markdown("---")
+    st.subheader("Provide Responses")
+
+    # --- Input Method Selection ---
+    st.radio(
+        "Choose input method:", ("Paste Text", "Upload File (.csv, .xlsx)"),
+        key=cfg.INPUT_METHOD_KEY, # Controls state directly
+        horizontal=True, label_visibility="collapsed"
+    )
+    input_method = st.session_state[cfg.INPUT_METHOD_KEY]
+    responses_list_input = [] # Local list for this tab's processing
+
+    # --- Conditional Input Areas ---
     if input_method == "Paste Text":
-        if st.session_state.get(cfg.CURRENT_FILE_NAME_KEY): keys_to_clear = [cfg.UPLOADED_DF_KEY, cfg.SELECTED_COLUMN_KEY, cfg.CURRENT_FILE_NAME_KEY, cfg.RESPONSES_RAW_KEY, cfg.SELECTED_COLUMN_IDX_KEY]; [st.session_state.pop(k, None) for k in keys_to_clear]; logging.info("Themer: Cleared file state.")
-        st.session_state[cfg.RESPONSES_INPUT_AREA_VAL_KEY] = st.text_area("📋 Paste Responses (One per line):", value=st.session_state.get(cfg.RESPONSES_INPUT_AREA_VAL_KEY, ''), height=200, key="theming_responses_paste_area_widget", placeholder="Response 1...\nResponse 2...\nResponse 3...")
-        raw_lines = st.session_state[cfg.RESPONSES_INPUT_AREA_VAL_KEY].splitlines(); responses_list_input = [r.strip() for r in raw_lines if r and r.strip()]
-        st.caption(f"{len(responses_list_input)} response(s) entered."); st.session_state[cfg.RESPONSES_RAW_KEY] = responses_list_input
+        # Clear file state if switching
+        if st.session_state.get(cfg.CURRENT_FILE_NAME_KEY):
+            keys_to_clear = [cfg.UPLOADED_DF_KEY, cfg.SELECTED_COLUMN_KEY, cfg.CURRENT_FILE_NAME_KEY, cfg.RESPONSES_RAW_KEY, cfg.SELECTED_COLUMN_IDX_KEY]
+            for key in keys_to_clear: st.session_state.pop(key, None)
+            logging.info("Themer: Cleared file state.")
+
+        st.session_state[cfg.RESPONSES_INPUT_AREA_VAL_KEY] = st.text_area(
+            "📋 Paste Responses (One per line):",
+            value=st.session_state.get(cfg.RESPONSES_INPUT_AREA_VAL_KEY, ''),
+            height=200, key="theming_responses_paste_area_widget",
+            placeholder="Response 1...\nResponse 2...\nResponse 3..."
+        )
+        # Process pasted text
+        raw_lines = st.session_state[cfg.RESPONSES_INPUT_AREA_VAL_KEY].splitlines()
+        responses_list_input = [r.strip() for r in raw_lines if r and r.strip()]
+        st.caption(f"{len(responses_list_input)} response(s) entered.")
+        # Store processed list in the main state key for analysis
+        st.session_state[cfg.RESPONSES_RAW_KEY] = responses_list_input
+
     elif input_method == "Upload File":
-        if st.session_state.get(cfg.RESPONSES_INPUT_AREA_VAL_KEY): st.session_state.pop(cfg.RESPONSES_INPUT_AREA_VAL_KEY, None); st.session_state.pop(cfg.RESPONSES_RAW_KEY, None); logging.info("Themer: Cleared text input state.")
-        uploaded_file = st.file_uploader("📁 Upload Data File:", type=['csv', 'xlsx', 'xls'], key="theming_file_uploader_widget", accept_multiple_files=False)
+        # Clear text state if switching
+        if st.session_state.get(cfg.RESPONSES_INPUT_AREA_VAL_KEY):
+             st.session_state.pop(cfg.RESPONSES_INPUT_AREA_VAL_KEY, None)
+             st.session_state.pop(cfg.RESPONSES_RAW_KEY, None)
+             logging.info("Themer: Cleared text input state.")
+
+        uploaded_file = st.file_uploader(
+            "📁 Upload Data File:", type=['csv', 'xlsx', 'xls'],
+            key="theming_file_uploader_widget", accept_multiple_files=False
+        )
         if uploaded_file is not None:
-            current_df = st.session_state.get(cfg.UPLOADED_DF_KEY); reload_file = (st.session_state.get(cfg.CURRENT_FILE_NAME_KEY) != uploaded_file.name) or (current_df is None or not isinstance(current_df, pd.DataFrame))
-            if reload_file:
-                logging.info(f"Themer: New file ('{uploaded_file.name}') loading."); st.session_state[cfg.RESPONSES_RAW_KEY] = [] # Clear responses before loading
+            current_df = st.session_state.get(cfg.UPLOADED_DF_KEY)
+            reload_file = (st.session_state.get(cfg.CURRENT_FILE_NAME_KEY) != uploaded_file.name) or \
+                          (current_df is None or not isinstance(current_df, pd.DataFrame))
+
+            if reload_file: # Load or reload file
+                logging.info(f"Themer: New file ('{uploaded_file.name}') loading.")
+                st.session_state[cfg.RESPONSES_RAW_KEY] = [] # Clear responses before loading
                 with st.spinner(f"Processing {uploaded_file.name}..."):
-                    keys_to_clear = [cfg.SELECTED_COLUMN_KEY, cfg.SELECTED_COLUMN_IDX_KEY, cfg.UPLOADED_DF_KEY]; [st.session_state.pop(k, None) for k in keys_to_clear]
-                    loaded_data = utils.load_data_from_file(uploaded_file)
-                    if loaded_data is not None and not loaded_data.empty: st.session_state[cfg.UPLOADED_DF_KEY] = loaded_data; st.session_state[cfg.CURRENT_FILE_NAME_KEY] = uploaded_file.name; logging.info(f"Themer: Loaded DF {loaded_data.shape}."); st.success(f"Loaded `{uploaded_file.name}` ({len(loaded_data)} rows)."); st.rerun()
-                    else: st.session_state.pop(cfg.UPLOADED_DF_KEY, None); st.session_state.pop(cfg.CURRENT_FILE_NAME_KEY, None)
+                    keys_to_clear = [cfg.SELECTED_COLUMN_KEY, cfg.SELECTED_COLUMN_IDX_KEY, cfg.UPLOADED_DF_KEY]
+                    for key in keys_to_clear: st.session_state.pop(key, None)
+                    loaded_data = utils.load_data_from_file(uploaded_file) # Use util function
+                    if loaded_data is not None and not loaded_data.empty:
+                        st.session_state[cfg.UPLOADED_DF_KEY] = loaded_data
+                        st.session_state[cfg.CURRENT_FILE_NAME_KEY] = uploaded_file.name
+                        logging.info(f"Themer: Loaded DF {loaded_data.shape}.")
+                        st.success(f"Loaded `{uploaded_file.name}` ({len(loaded_data)} rows). Select column below.")
+                        st.rerun() # Rerun needed after successful load
+                    else: # load_data handles error messages
+                        st.session_state.pop(cfg.UPLOADED_DF_KEY, None)
+                        st.session_state.pop(cfg.CURRENT_FILE_NAME_KEY, None)
+
+            # --- Column Selection (Only if DF is loaded) ---
             df_for_selection = st.session_state.get(cfg.UPLOADED_DF_KEY)
             if df_for_selection is not None and isinstance(df_for_selection, pd.DataFrame):
-                st.markdown("---"); st.write(f"**File:** `{st.session_state.get(cfg.CURRENT_FILE_NAME_KEY, 'N/A')}` ({len(df_for_selection)} rows)")
+                st.markdown("---")
+                st.write(f"**File:** `{st.session_state.get(cfg.CURRENT_FILE_NAME_KEY, 'N/A')}` ({len(df_for_selection)} rows)")
                 with st.expander("Preview Data"):
                     try: st.dataframe(df_for_selection.head(), use_container_width=True, height=200)
                     except Exception as e: st.warning(f"Preview error: {e}")
+
                 available_columns = df_for_selection.columns.tolist()
                 if available_columns:
-                    current_index = st.session_state.get(cfg.SELECTED_COLUMN_IDX_KEY, 0); current_index = 0 if current_index >= len(available_columns) else current_index
+                    current_index = st.session_state.get(cfg.SELECTED_COLUMN_IDX_KEY, 0)
+                    current_index = 0 if current_index >= len(available_columns) else current_index
+                    # Auto-detect plausible column only if none selected yet
                     if st.session_state.get(cfg.SELECTED_COLUMN_KEY) is None:
-                        kw = ['response', 'feedback', 'text', 'comment', 'verbatim', 'open end', 'answer']; pc = [c for c in available_columns if any(k in str(c).lower() for k in kw)]
-                        if pc: try: current_index = available_columns.index(pc[0]); logging.info(f"Themer: Auto-selected '{pc[0]}'") except ValueError: pass
-                    selected_col_name = st.selectbox("⬇️ **Select column with responses:**", options=available_columns, index=current_index, key="theming_column_selector_widget")
-                    if selected_col_name != st.session_state.get(cfg.SELECTED_COLUMN_KEY): st.session_state[cfg.SELECTED_COLUMN_KEY] = selected_col_name; st.session_state[cfg.RESPONSES_RAW_KEY] = [] # Clear responses on change
-                    try: st.session_state[cfg.SELECTED_COLUMN_IDX_KEY] = available_columns.index(selected_col_name)
-                    except ValueError: st.session_state[cfg.SELECTED_COLUMN_IDX_KEY] = 0
+                        kw = ['response', 'feedback', 'text', 'comment', 'verbatim', 'open end', 'answer']
+                        pc = [c for c in available_columns if any(k in str(c).lower() for k in kw)]
+                        # --- CORRECTED BLOCK ---
+                        if pc: # If plausible columns were found
+                            try:
+                                current_index = available_columns.index(pc[0]) # Try to get index of the first plausible one
+                                logging.info(f"Themer: Auto-selected plausible column: '{pc[0]}' at index {current_index}")
+                            except ValueError:
+                                # Keep default index if error
+                                pass
+                        # --- END CORRECTED BLOCK ---
+
+                    selected_col_name = st.selectbox(
+                        "⬇️ **Select column with responses:**",
+                        options=available_columns, index=current_index,
+                        key="theming_column_selector_widget" # Use themer specific key
+                    )
+                    # Update state if selection changed
+                    if selected_col_name != st.session_state.get(cfg.SELECTED_COLUMN_KEY):
+                         st.session_state[cfg.SELECTED_COLUMN_KEY] = selected_col_name
+                         st.session_state[cfg.RESPONSES_RAW_KEY] = [] # Clear old responses on change
+                    try: # Update index regardless of change to be safe
+                         st.session_state[cfg.SELECTED_COLUMN_IDX_KEY] = available_columns.index(selected_col_name)
+                    except ValueError:
+                         st.session_state[cfg.SELECTED_COLUMN_IDX_KEY] = 0 # Reset if error
+
+                    # Extract responses if column selected and responses not yet extracted
                     if selected_col_name and not st.session_state.get(cfg.RESPONSES_RAW_KEY):
                         try:
-                            if selected_col_name in df_for_selection.columns: series = df_for_selection[selected_col_name].astype(str).fillna(''); responses_list_input = [r.strip() for r in series if r and r.strip()]; st.caption(f"{len(responses_list_input)} valid response(s) extracted."); st.session_state[cfg.RESPONSES_RAW_KEY] = responses_list_input
-                            else: st.error(f"Column '{selected_col_name}' missing."); st.session_state[cfg.RESPONSES_RAW_KEY] = []
-                        except Exception as e: st.error(f"Extraction error: {e}"); logging.exception("Themer: Column extraction error."); st.session_state[cfg.RESPONSES_RAW_KEY] = []
-                else: st.error("Uploaded file has no columns."); st.session_state.pop(cfg.UPLOADED_DF_KEY, None)
-        else: # No file
-            if st.session_state.get(cfg.CURRENT_FILE_NAME_KEY): keys_to_clear = [cfg.UPLOADED_DF_KEY, cfg.SELECTED_COLUMN_KEY, cfg.CURRENT_FILE_NAME_KEY, cfg.RESPONSES_RAW_KEY, cfg.SELECTED_COLUMN_IDX_KEY]; [st.session_state.pop(k, None) for k in keys_to_clear]; logging.info("Themer: File removed.")
+                            if selected_col_name in df_for_selection.columns:
+                                series = df_for_selection[selected_col_name].astype(str).fillna('')
+                                responses_list_input = [r.strip() for r in series if r and r.strip()]
+                                st.caption(f"{len(responses_list_input)} valid response(s) extracted.")
+                                st.session_state[cfg.RESPONSES_RAW_KEY] = responses_list_input # Store for analysis
+                            else:
+                                st.error(f"Column '{selected_col_name}' missing."); st.session_state[cfg.RESPONSES_RAW_KEY] = []
+                        except Exception as e:
+                            st.error(f"Extraction error: {e}"); logging.exception("Themer: Column extraction error."); st.session_state[cfg.RESPONSES_RAW_KEY] = []
+                else:
+                    st.error("Uploaded file has no columns."); st.session_state.pop(cfg.UPLOADED_DF_KEY, None)
+
+        else: # No file uploaded or removed
+            if st.session_state.get(cfg.CURRENT_FILE_NAME_KEY):
+                keys_to_clear = [cfg.UPLOADED_DF_KEY, cfg.SELECTED_COLUMN_KEY, cfg.CURRENT_FILE_NAME_KEY, cfg.RESPONSES_RAW_KEY, cfg.SELECTED_COLUMN_IDX_KEY]
+                for key in keys_to_clear: st.session_state.pop(key, None)
+                logging.info("Themer: File removed.")
+
+    # --- Generate Themes Button ---
     st.markdown("---"); st.subheader("Generate Themes")
     question_ready = st.session_state.get(cfg.SURVEY_QUESTION_KEY, '').strip(); responses_ready = isinstance(st.session_state.get(cfg.RESPONSES_RAW_KEY), list) and bool(st.session_state.get(cfg.RESPONSES_RAW_KEY)); can_generate = question_ready and responses_ready
     if not can_generate:
@@ -297,7 +390,7 @@ with input_tab:
             if generated_themes is not None:
                 st.session_state[cfg.GENERATED_THEMES_KEY] = generated_themes; st.session_state[cfg.EDITED_THEMES_KEY] = [] # Reset edited themes
                 if not generated_themes: st.warning("AI found no themes."); theme_gen_success = True
-                else: st.success(f"Generated {len(generated_themes)} themes."); theme_gen_success = True
+                else: st.success(f"Generated {len(generated_themes)} initial themes."); theme_gen_success = True
                 if generated_themes:
                     with st.spinner("AI writing descriptions..."): desc_map = ai_core.generate_theme_descriptions_llm(generated_themes, question, responses_sample, api_key, theming_gen_config)
                     merged_themes = []; themes_no_desc = []
@@ -309,8 +402,7 @@ with input_tab:
                         if themes_no_desc: st.warning(f"No descriptions for: {', '.join(themes_no_desc)}")
                         st.session_state[cfg.EDITED_THEMES_KEY] = merged_themes; logging.info(f"Themer: Initialized edited themes: {len(merged_themes)}")
             else: st.error("Theme generation failed."); st.session_state[cfg.GENERATED_THEMES_KEY] = None; st.session_state[cfg.EDITED_THEMES_KEY] = []
-            if theme_gen_success: st.info("✅ Proceed to '✏️ Review & Refine'."); time.sleep(1)
-
+            if theme_gen_success: st.info("✅ Proceed to '✏️ Review & Refine'."); time.sleep(1)# (Keep existing Themer Input Tab code - PASTE HERE, ensure using cfg keys)
 # ======================= Tab 2: Review & Refine ===========================
 # (Keep existing Themer Review Tab code - PASTE HERE)
 with review_tab:
