@@ -2,7 +2,7 @@
 """
 Functions for creating and displaying UI components in the Streamlit app.
 Includes visualizations (word cloud, charts), editors (themes, assignments),
-and data exploration elements. Includes refinements for data editor state handling.
+and data exploration elements. Includes TEMPORARY DEBUGGING for data editor.
 """
 
 import streamlit as st
@@ -15,6 +15,7 @@ import logging
 import time
 import json
 import random
+import io # Needed for df.info() buffer in debug
 
 # Import specific config keys and constants from Themer's config
 from config import (
@@ -23,7 +24,7 @@ from config import (
     # Assuming Phronesis theme colors are now in Themer's config.py:
     PRIMARY_ACCENT_COLOR, CHART_SUCCESS_COLOR, CHART_WARNING_COLOR, CHART_ERROR_COLOR,
     MAIN_BACKGROUND_COLOR, BODY_TEXT_COLOR, CARD_BACKGROUND_COLOR, INPUT_BORDER_COLOR,
-    MAIN_TITLE_COLOR, SUBTITLE_COLOR # Add others needed by charts/components
+    MAIN_TITLE_COLOR, SUBTITLE_COLOR
 )
 
 
@@ -179,20 +180,14 @@ def display_theme_editor(themes_data_state_key=EDITED_THEMES_KEY):
     Modifies the theme structure list directly in Streamlit's session state.
     Includes loading/saving theme structure from/to JSON.
     """
-    if themes_data_state_key not in st.session_state or not isinstance(st.session_state.get(themes_data_state_key), list):
-        st.session_state[themes_data_state_key] = []
-        logging.info(f"Init state '{themes_data_state_key}' for editor.")
+    # ... (Keep the full function code from previous versions - omitted for brevity) ...
+    if themes_data_state_key not in st.session_state or not isinstance(st.session_state.get(themes_data_state_key), list): st.session_state[themes_data_state_key] = []; logging.info(f"Init state '{themes_data_state_key}' for editor.")
     themes_data = st.session_state[themes_data_state_key]
-    if not themes_data:
-        st.info("No themes generated/loaded. Add below or generate on first tab.")
-
-    # --- Button Callbacks ---
+    if not themes_data: st.info("No themes generated/loaded. Add below or generate on first tab.")
     def _del_theme_cb(idx): current = st.session_state.get(themes_data_state_key, []); del current[idx]; st.session_state[themes_data_state_key] = current; st.toast(f"Theme {idx+1} removed."); st.rerun()
     def _del_sub_cb(t_idx, s_idx): current = st.session_state.get(themes_data_state_key, []); item = current[t_idx]; subs = item.get('sub_themes', []); del subs[s_idx]; item['sub_themes'] = subs; st.session_state[themes_data_state_key] = current; st.toast(f"Sub-theme removed from Theme {t_idx+1}."); st.rerun()
     def _add_sub_cb(t_idx): current = st.session_state.get(themes_data_state_key, []); item = current[t_idx]; item.setdefault('sub_themes', []).append(""); st.session_state[themes_data_state_key] = current; st.toast(f"New sub-theme added to Theme {t_idx+1}."); st.rerun()
     def _add_theme_cb(): current = st.session_state.get(themes_data_state_key, []); name = f'New Theme {len(current)+1}'; current.append({'theme': name, 'sub_themes': ['New Sub-theme 1'], 'description': ''}); st.session_state[themes_data_state_key] = current; st.toast(f"'{name}' added."); st.rerun()
-
-    # --- Render Themes ---
     num_themes_render = len(st.session_state.get(themes_data_state_key, []))
     for i in range(num_themes_render):
         current_list = st.session_state.get(themes_data_state_key, [])
@@ -214,8 +209,6 @@ def display_theme_editor(themes_data_state_key=EDITED_THEMES_KEY):
             st.button("➕ Add Sub-theme", key=add_s, on_click=_add_sub_cb, args=(i,))
     st.markdown("---"); st.button("➕ Add New Theme", key=f"add_theme_btn_{themes_data_state_key}", on_click=_add_theme_cb)
     st.markdown("---")
-
-    # --- Save Button Logic ---
     if st.button("💾 Save ALL Refined Themes", key=f"save_themes_btn_{themes_data_state_key}", type="primary"):
         updated_list = []; num_themes_state = len(st.session_state.get(themes_data_state_key, [])); all_ok = True
         for i in range(num_themes_state): # Iterate based on state length *before* potential deletes
@@ -236,8 +229,6 @@ def display_theme_editor(themes_data_state_key=EDITED_THEMES_KEY):
         if all_ok: st.success("Themes saved."); st.toast("Themes updated!", icon="✏️")
         else: st.warning("Themes saved, but review structure below (some fields might be lost)."); st.toast("Themes updated (check review).", icon="⚠️")
         st.rerun()
-
-    # --- Display/Load/Save ---
     st.markdown("---"); st.subheader("Current Saved Structure"); current_saved = st.session_state.get(themes_data_state_key, [])
     if current_saved:
          try: json_str = json.dumps(current_saved, indent=2); st.download_button(label="💾 Download Structure (JSON)", data=json_str, file_name=f"themer_structure_{time.strftime('%Y%m%d')}.json", mime="application/json", key=f"dl_themes_{themes_data_state_key}")
@@ -265,71 +256,67 @@ def display_theme_editor(themes_data_state_key=EDITED_THEMES_KEY):
         except Exception as e: st.error(f"Load error: {e}"); logging.exception(f"Error loading theme structure: {up_file.name}")
 
 
-# --- Assignment Results Editor (REFINED - Direct Cleaning) ---
+# --- Assignment Results Editor (Includes DEBUGGING) ---
 def display_assignment_results_editable(df_state_key=ASSIGNMENT_DF_KEY, themes_state_key=EDITED_THEMES_KEY):
     """
     Displays the theme assignment results in an editable st.data_editor.
-    Includes robust checks to prevent error loops.
+    Includes robust checks and TEMPORARY DEBUGGING output.
     """
-    # --- Get Data and Validate --- ## <<< CORRECTED VALIDATION LOGIC START >>> ##
-    if df_state_key not in st.session_state or \
-       not isinstance(st.session_state.get(df_state_key), pd.DataFrame) or \
-       st.session_state.get(df_state_key, pd.DataFrame()).empty:
-        # Combine checks: Key exists? Is it a DF? Is it empty?
+    # --- Get Data and Validate ---
+    if df_state_key not in st.session_state:
+        st.info("No assignment results available. Run assignment first.")
+        return
 
-        # Only log error and clear state if key exists but is WRONG TYPE
-        if df_state_key in st.session_state and not isinstance(st.session_state.get(df_state_key), pd.DataFrame):
-             logging.error(f"State key {df_state_key} is not a DataFrame (Type: {type(st.session_state.get(df_state_key))}). Clearing.")
-             st.session_state.pop(df_state_key, None) # Clear only if wrong type
-             st.warning("Cleared invalid assignment data. Please run assignment again.")
-             # Don't rerun here, let the main script flow continue or the user interact
-        else:
-             # If key missing or DF is empty, just show info message and return
-             st.info("No assignment results to display/edit. Run assignment first.")
-        return # Exit function gracefully if no valid, non-empty DataFrame
+    results_df_from_state = st.session_state.get(df_state_key)
 
-    # If we reach here, results_df should be a non-empty DataFrame
-    results_df = st.session_state[df_state_key]
-    # --- End of Modified Validation --- ## <<< CORRECTED VALIDATION LOGIC END >>> ##
+    if not isinstance(results_df_from_state, pd.DataFrame):
+        logging.error(f"State key {df_state_key} is not DataFrame (Type: {type(results_df_from_state)}). Clearing state.")
+        st.warning("Cleared invalid assignment data. Please run assignment again.")
+        st.session_state.pop(df_state_key, None)
+        st.rerun()
+        return
+    if results_df_from_state.empty:
+         st.info("Assignment results are empty. No data to edit.")
+         return
 
+    # If we passed checks, proceed using a copy for safety before editing/cleaning
+    results_df = results_df_from_state.copy()
 
     st.info("Manually review/edit assignments below. Click 'Save Manual Changes' to update.")
 
-    # --- DataFrame Preparation (Clean DIRECTLY before config/editor) ---
+    # --- DataFrame Preparation (Clean the COPY before config/editor) ---
     required_cols = ["response", "assigned_theme", "assigned_sub_theme", "assignment_confidence"]
     if not all(col in results_df.columns for col in required_cols):
         missing_cols = [col for col in required_cols if col not in results_df.columns]
-        st.error(f"Assignment DF missing cols: {', '.join(missing_cols)}. Cannot display.")
+        st.error(f"Assignment DF missing required columns: {', '.join(missing_cols)}. Cannot display editor.")
         logging.error(f"Themer Assignment DF missing cols: {missing_cols}")
         return
 
     try:
-        # Modify the DataFrame retrieved from state directly
-        # Ensure correct types and handle NAs
+        # Clean the DataFrame copy
         results_df['assigned_theme'] = results_df['assigned_theme'].fillna("Uncategorized").astype(str)
         results_df['assigned_sub_theme'] = results_df['assigned_sub_theme'].fillna("N/A").astype(str)
         results_df['assignment_confidence'] = results_df['assignment_confidence'].fillna("Low").astype(str)
         results_df['response'] = results_df['response'].fillna("").astype(str)
-        # Enforce 'Uncategorized' rule *on the DataFrame being passed to editor*
         results_df.loc[results_df['assigned_theme'] == "Uncategorized", 'assigned_sub_theme'] = "N/A"
     except Exception as e:
         st.error(f"Failed preparing data for editor: {e}")
         logging.error(f"Themer: Error cleaning state DF for data editor: {e}")
-        return # Don't proceed if cleaning fails
+        return
 
     # --- Prepare Theme Options (Based on cleaned DataFrame and structure) ---
     theme_structure = st.session_state.get(themes_state_key, [])
     defined_theme_labels = set()
     if isinstance(theme_structure, list) and theme_structure:
         defined_theme_labels = set(str(t.get('theme', '')).strip() for t in theme_structure if t.get('theme') and str(t.get('theme','')).strip())
-    else: st.warning("Theme structure missing/invalid. Theme dropdown options limited.")
-    try: themes_in_data = set(results_df['assigned_theme'].unique()) # Already string type from cleaning
+    else: st.warning("Theme structure missing/invalid. Theme dropdown options may be limited.")
+    try: themes_in_data = set(results_df['assigned_theme'].unique()) # Use cleaned data
     except Exception as e: st.error(f"Error getting themes from DF: {e}"); themes_in_data = set()
     all_theme_options_set = defined_theme_labels | themes_in_data | {"Uncategorized"}
     theme_options = sorted([opt for opt in all_theme_options_set if pd.notna(opt) and str(opt).strip()])
     if not theme_options: theme_options = ["Uncategorized"]
 
-    # Default themes that might not be in options list need to be reset
+    # Ensure themes in the dataframe are actually in the options list
     results_df['assigned_theme'] = results_df['assigned_theme'].apply(lambda x: x if x in theme_options else "Uncategorized")
     # Re-apply Uncategorized rule after potential reset above
     results_df.loc[results_df['assigned_theme'] == "Uncategorized", 'assigned_sub_theme'] = "N/A"
@@ -343,46 +330,88 @@ def display_assignment_results_editable(df_state_key=ASSIGNMENT_DF_KEY, themes_s
         "assignment_confidence": st.column_config.SelectboxColumn("Confidence", width="small", options=["High", "Medium", "Low"], required=True),
     }
 
+    # --- >>> ADD TEMP DEBUGGING <<< ---
+    with st.expander("DEBUG INFO (Data Editor Input)", expanded=False):
+        st.write("**DataFrame Info passed to editor:**")
+        try:
+            # Create a string buffer to capture df.info() output
+            buffer = io.StringIO()
+            results_df.info(buf=buffer)
+            s = buffer.getvalue()
+            st.text(s) # Display df info including types and non-null counts
+            st.write("**First 2 rows passed to editor:**")
+            st.dataframe(results_df.head(2)) # Show first few rows of the cleaned df
+        except Exception as e:
+            st.error(f"Error displaying DataFrame info: {e}")
+        st.write("**Column Config:**")
+        # Convert config values to strings for JSON serialization if they aren't primitives
+        serializable_config = {}
+        for k, v in column_config.items():
+            try: # Attempt to represent the config object, may not be perfect
+                serializable_config[k] = str(v)
+            except:
+                 serializable_config[k] = f"Cannot serialize config object for {k}"
+        st.json(serializable_config, expanded=False) # Display the config dict
+        st.write(f"**Editor Key:** `{ASSIGNMENT_EDITOR_WIDGET_KEY}`")
+    # --- >>> END TEMP DEBUGGING <<< ---
+
+
     # --- Display Data Editor ---
     st.markdown("#### Edit Assignments")
+    edited_df = None # Initialize edited_df to None
     try:
         edited_df = st.data_editor(
-            results_df, # Pass the modified DataFrame
+            results_df, # Pass the cleaned DataFrame
             key=ASSIGNMENT_EDITOR_WIDGET_KEY,
             use_container_width=True, column_config=column_config,
             column_order=required_cols, num_rows="fixed", hide_index=True,
             disabled=["response"]
         )
     except Exception as editor_err:
-         st.error(f"Data editor failed to render: {editor_err}. Try refreshing the page.")
+         # Catch errors during the editor call itself
+         st.error(f"Data editor failed to render: {editor_err}. See logs for details. Try refreshing.")
          logging.exception("Themer: st.data_editor failed to render.")
-         return
+         # Optionally display the debug info again here if it failed during render
+         return # Stop function execution if editor fails to render
 
     # --- Save Changes Button ---
-    if st.button("💾 Save Manual Assignment Changes", key=f"save_manual_assignments_btn_{df_state_key}"):
-        if not isinstance(edited_df, pd.DataFrame):
-            st.error("Error saving: Editor data invalid. Refresh?"); logging.error("Themer: editor output not DF."); return
+    # Check if edited_df was successfully created by the editor
+    if edited_df is not None and isinstance(edited_df, pd.DataFrame):
+        if st.button("💾 Save Manual Assignment Changes", key=f"save_manual_assignments_btn_{df_state_key}"):
 
-        valid = True; validation_warnings = []
-        for index, row in edited_df.iterrows():
-            theme = row['assigned_theme']; sub_theme = row['assigned_sub_theme']
-            if not theme or not sub_theme or not row['assignment_confidence']: valid=False; validation_warnings.append(f"Row {index+1}: Required fields empty.")
-            if theme == "Uncategorized" and sub_theme != "N/A": validation_warnings.append(f"Row {index+1}: Uncategorized needs 'N/A' sub."); valid = False
+            # --- Validation Logic ---
+            valid = True; validation_warnings = []
+            for index, row in edited_df.iterrows():
+                theme = row['assigned_theme']; sub_theme = row['assigned_sub_theme']
+                if not theme or not sub_theme or not row['assignment_confidence']: valid=False; validation_warnings.append(f"Row {index+1}: Required fields empty.")
+                if theme == "Uncategorized" and sub_theme != "N/A": validation_warnings.append(f"Row {index+1}: Uncategorized needs 'N/A' sub."); valid = False
+                # Add other validation if needed
 
-        if valid:
-            try:
-                # Save the validated edited data back to session state
-                # Ensure index matches original state DF before saving
-                edited_df.index = st.session_state[df_state_key].index
-                st.session_state[df_state_key] = edited_df.copy() # Save the copy
-                st.success("Manual assignment changes saved!"); st.toast("Assignments updated!", icon="💾")
-                logging.info(f"Themer: Manual assignments saved '{df_state_key}'.")
-                time.sleep(0.5); st.rerun()
-            except Exception as save_err: st.error(f"Error saving: {save_err}"); logging.error(f"Themer: Error saving DF: {save_err}")
-        else:
-            st.error("Validation Failed! Correct issues before saving:");
-            for i, w in enumerate(validation_warnings): st.warning(w) if i<5 else st.warning(f"...{len(validation_warnings)-5} more issues."); break
-            logging.warning(f"Themer: Manual assignment save validation failed ({len(validation_warnings)} issues).")
+            if valid:
+                try:
+                    # Ensure index consistency before saving back to state
+                    edited_df_copy = edited_df.copy() # Work with a copy for saving
+                    original_index = st.session_state[df_state_key].index
+                    if len(original_index) == len(edited_df_copy):
+                        edited_df_copy.index = original_index
+                        st.session_state[df_state_key] = edited_df_copy # Save the copy
+                        st.success("Manual assignment changes saved!"); st.toast("Assignments updated!", icon="💾")
+                        logging.info(f"Themer: Manual assignments saved '{df_state_key}'.")
+                        time.sleep(0.5); st.rerun()
+                    else:
+                         st.error("Error saving: Row count mismatch after editing. Cannot save.")
+                         logging.error(f"Themer: Row count mismatch during save. Original: {len(original_index)}, Edited: {len(edited_df_copy)}")
+
+                except Exception as save_err:
+                    st.error(f"Error saving changes: {save_err}")
+                    logging.error(f"Themer: Error saving edited DF: {save_err}")
+            else:
+                st.error("Validation Failed! Correct issues below before saving:");
+                for i, w in enumerate(validation_warnings): st.warning(w) if i<5 else st.warning(f"...{len(validation_warnings)-5} more issues."); break
+                logging.warning(f"Themer: Manual assignment save validation failed ({len(validation_warnings)} issues).")
+    elif edited_df is None:
+         # This case might be hit if the editor failed to render initially
+         st.warning("Data editor did not render correctly. Cannot save changes.")
 
 
 # Theme Examples Display
