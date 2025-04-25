@@ -153,7 +153,7 @@ with st.sidebar:
 # ==========================================================================
 # --- Main Application Area ---
 # ==========================================================================
-st.markdown("<h1 style='margin-bottom: 1rem; font-size: 2.2rem;'>AI Themer</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='margin-bottom: 1rem; font-size: 2.2rem;'>AI Themer-Beta</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; margin-bottom: 2rem; color: #a9b4d2;'>Generate, refine, and apply themes to open-ended responses.</p>", unsafe_allow_html=True)
 
 tab_list = [ "📥 Input & Generate", "✏️ Review & Refine", "🏷️ Assign & Edit Results", "📊 Explore & Visualize", "❓ Ask AI" ]
