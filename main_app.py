@@ -389,31 +389,34 @@ with viz_tab:
         except Exception as e: st.error(f"Word cloud error: {e}"); logging.exception("Themer: Word cloud UI error.")
 
 # ========================== Tab 5: Ask AI =================================
+# ========================== Tab 5: Ask AI =================================
 with ai_qa_tab:
     st.header("❓ Ask AI About the Raw Data")
 
+    # Check prerequisites: raw responses and survey question must exist
     responses_avail_qa = isinstance(st.session_state.get(cfg.RESPONSES_RAW_KEY), list) and bool(st.session_state.get(cfg.RESPONSES_RAW_KEY))
     question_avail_qa = isinstance(st.session_state.get(cfg.SURVEY_QUESTION_KEY), str) and bool(st.session_state.get(cfg.SURVEY_QUESTION_KEY, '').strip())
 
     if not responses_avail_qa or not question_avail_qa:
         st.info("Provide survey question and responses in the '📥 Input & Generate' tab first to enable Q&A.")
     else:
+        # Retrieve data safely from session state
         question_qa = st.session_state[cfg.SURVEY_QUESTION_KEY]
         responses_list_qa = st.session_state[cfg.RESPONSES_RAW_KEY]
-        api_key = st.session_state.get(cfg.API_KEY_STATE_KEY)
+        api_key = st.session_state.get(cfg.API_KEY_STATE_KEY) # Use themer API key state
 
         st.markdown("Ask a question about the **original raw responses**. The AI will use these responses and the survey question you provided as context to answer.")
         st.info(f"Context: Survey Question \"_{question_qa}_\" and {len(responses_list_qa)} raw responses.")
 
         # Q&A Input Area
         user_ai_question = st.text_area(
-            "Your Question:", key="ai_qa_input_main_widget", height=100, # Unique key
+            "Your Question:", key="ai_qa_input_main_widget", height=100, # Unique key for this text area
             placeholder="e.g., What are the main recurring ideas in the feedback?\nList responses mentioning 'price' or 'cost'.\nSummarize the positive comments.\nWhich comments seem confused?"
         )
 
         # Ask Button
-        if st.button("Ask AI", key="ask_ai_button_main_widget", type="primary"): # Unique key
-            user_question_stripped = user_ai_question.strip() # Read from widget state
+        if st.button("Ask AI", key="ask_ai_button_main_widget", type="primary"): # Unique key for button
+            user_question_stripped = user_ai_question.strip() # Read from widget state using its value attribute implicitly
             if not user_question_stripped:
                 st.warning("Please enter a question.")
             else:
@@ -433,13 +436,14 @@ with ai_qa_tab:
 
                 # Add to history (most recent first)
                 if ai_answer is not None:
+                     # Ensure history list exists
                      if not isinstance(st.session_state.get(cfg.AI_QA_HISTORY_KEY), list):
                           st.session_state[cfg.AI_QA_HISTORY_KEY] = []
                      st.session_state[cfg.AI_QA_HISTORY_KEY].insert(0, {"question": user_question_stripped, "answer": ai_answer})
                      logging.info(f"Themer Q&A: Q='{user_question_stripped[:50]}...', A_len={len(str(ai_answer))}")
 
                      # --- LINE REMOVED ---
-                     # st.session_state.ai_qa_input_main_widget = "" # <<-- THIS LINE REMOVED
+                     # st.session_state.ai_qa_input_main_widget = "" # <<-- THIS LINE IS REMOVED/COMMENTED OUT
                      # --- END REMOVED LINE ---
 
                      st.rerun() # Rerun to display the new answer
@@ -461,7 +465,6 @@ with ai_qa_tab:
                      st.markdown(a_text, unsafe_allow_html=True)
         else:
             st.caption("No questions asked yet in this session.")
-
 # --- Footer ---
 st.markdown(f"""<div class="footer"><p>© {time.strftime('%Y')} Phronesis Partners. All rights reserved.</p></div>""", unsafe_allow_html=True)
 
