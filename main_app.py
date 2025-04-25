@@ -67,7 +67,8 @@ def clear_themer_app_state(clear_api_keys=False):
         cfg.SELECTED_COLUMN_KEY, cfg.INPUT_METHOD_KEY, cfg.CURRENT_FILE_NAME_KEY,
         cfg.GENERATED_THEMES_KEY, cfg.EDITED_THEMES_KEY, cfg.ASSIGNMENT_DF_KEY,
         cfg.AI_QA_HISTORY_KEY, cfg.RESPONSES_INPUT_AREA_VAL_KEY, cfg.SELECTED_COLUMN_IDX_KEY,
-        cfg.UPLOADED_THEME_FILE_WIDGET_KEY, cfg.ASSIGNMENT_EDITOR_WIDGET_KEY,
+        #cfg.UPLOADED_THEME_FILE_WIDGET_KEY, 
+        cfg.ASSIGNMENT_EDITOR_WIDGET_KEY,
         "ai_qa_input_main_widget", # Clearing specific widget state key if it exists
     ]
     if clear_api_keys:
