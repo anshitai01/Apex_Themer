@@ -53,7 +53,7 @@ default_state_values = {
     cfg.BATCH_SIZE_KEY: 15, cfg.SAMPLE_SIZE_KEY: 100, cfg.GEN_TEMP_KEY: 0.5,
     cfg.GEN_TOP_K_KEY: 40, cfg.GEN_TOP_P_KEY: 0.95, cfg.GEN_MAX_TOKENS_KEY: 4096,
     #cfg.UPLOADED_THEME_FILE_WIDGET_KEY: None, 
-    cfg.ASSIGNMENT_EDITOR_WIDGET_KEY: None,
+    #cfg.ASSIGNMENT_EDITOR_WIDGET_KEY: None,
 }
 for key, default_value in default_state_values.items():
     if key not in st.session_state:
