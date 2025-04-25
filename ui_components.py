@@ -2,7 +2,7 @@
 """
 Functions for creating and displaying UI components in the Streamlit app.
 Includes visualizations (word cloud, charts), editors (themes, assignments),
-and data exploration elements. FINAL VERSION with all fixes.
+and data exploration elements. FINAL COMPLETE VERSION with all fixes.
 """
 
 import streamlit as st
@@ -155,7 +155,7 @@ def display_theme_distribution(df_state_key):
         # --- Sub-themes (overall) ---
         st.subheader("Overall Sub-theme Distribution")
         excluded_subs = ['N/A', 'Error', 'General', 'Other', '', 'nan', 'None']
-        sub_counts = df_valid[~df_valid['assigned_sub_theme'].isin(excluded_subs) & (df_valid['assigned_theme'] != "Uncategorized")]['assigned_sub_theme'].value_counts().reset_index()
+        sub_counts = df_valid[~df_valid['assigned_sub_theme'].astype(str).isin(excluded_subs) & (df_valid['assigned_theme'] != "Uncategorized")]['assigned_sub_theme'].value_counts().reset_index()
         sub_counts.columns = ['Sub-theme', 'Count']
         if not sub_counts.empty:
             max_subs = 25
@@ -387,7 +387,7 @@ def display_assignment_results_editable(df_state_key=ASSIGNMENT_DF_KEY, themes_s
                 logging.warning(f"Themer: Manual assignment save validation failed ({len(validation_warnings)} issues).")
     elif edited_df is None:
          # This case might be hit if the editor failed to render initially
-         st.warning("Data editor did not render correctly. Cannot save changes.")
+         st.caption("Data editor did not load correctly, saving is disabled.") # Changed from warning
 
 
 # Theme Examples Display
