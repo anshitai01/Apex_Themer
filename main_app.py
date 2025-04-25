@@ -163,7 +163,7 @@ theming_gen_config = GenerationConfig(temperature=st.session_state[cfg.GEN_TEMP_
 
 # ======================= Tab 1: Input & Generate ==========================
 with input_tab:
-    st.header("1. Input Data and Generate Initial Themes")
+    st.header("Input Data and Generate Initial Themes")
     st.session_state[cfg.SURVEY_QUESTION_KEY] = st.text_area("❓ **Survey Question:**", value=st.session_state.get(cfg.SURVEY_QUESTION_KEY, ''), height=100, key="theming_q_input_main", placeholder="e.g., What aspects of the event did you find most valuable?")
     st.markdown("---"); st.subheader("Provide Responses")
     st.radio("Choose input method:", ("Paste Text", "Upload File (.csv, .xlsx)"), key=cfg.INPUT_METHOD_KEY, horizontal=True, label_visibility="collapsed")
