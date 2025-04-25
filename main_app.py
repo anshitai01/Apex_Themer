@@ -107,7 +107,7 @@ with st.sidebar:
     logo_base64 = get_base64_of_bin_file(LOGO_PATH)
     logo_html = f'<img src="data:image/png;base64,{logo_base64}" alt="Logo" class="sidebar-logo">' if logo_base64 else '<div class="sidebar-logo-placeholder">Logo</div>'
     st.markdown(logo_html, unsafe_allow_html=True) # Logo CSS is in styling.py
-    st.header("⚙️ Settings & Controls")
+    #st.header("⚙️ Settings & Controls")
 
     # --- API Key Handling ---
     api_key_source = None
